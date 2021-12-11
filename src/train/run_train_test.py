@@ -9,6 +9,8 @@ from src.utils.reproducibility import set_random_seed
 from src.model.retrieval import MatchingModel
 from src.graph_construction.tabular_graph import TabularGraph
 from src.utils.process_table_and_query import *
+import torch
+import json
 
 queries = None
 tables = None
@@ -118,9 +120,14 @@ def train(config, model, train_query_ids, optimizer, scheduler, loss_func):
 
     return eloss / len(train_query_ids)
 
+def save_model(epoc, model):
+    file_name = 'output/webquerytable/model_epoc_%d.bin' % epoc
+    torch.save(model.state_dict(), file_name)
 
 def train_and_test(config):
     set_random_seed()
+
+    f_o_log = open('output/webquerytable/log.txt', 'w')
 
     global queries, tables, qtrels
 
@@ -202,7 +209,7 @@ def train_and_test(config):
     test_query_ids = new_ids
     #######################################
 
-    constructor = TabularGraph(config["use_fasttext"], config["fasttext"])
+    constructor = TabularGraph(config["fasttext"], config["merge_same_cells"])
 
     queries["feature"] = process_queries(queries["sentence"], constructor)
     process_tables(tables, constructor)
@@ -232,11 +239,28 @@ def train_and_test(config):
     for epoch in range(config['epoch']):
         eloss = train(config, model, train_query_ids, optimizer, scheduler, loss_func)
         dev_metrics = evaluate(config, model, dev_query_ids)
+        
+        save_model(epoch, model)
 
         if best_metrics is None or dev_metrics[config['key_metric']] > best_metrics[config['key_metric']]:
             best_metrics = dev_metrics
+           
+            log_msg = 'epoch=%d, dev, %s' % (epoch, json.dumps(best_metrics))
+            f_o_log.write(log_msg + '\n')
+
             test_metrics = evaluate(config, model, test_query_ids)
+            
+            log_msg = 'epoch=%d, test, %s' % (epoch, json.dumps(test_metrics))
+            f_o_log.write(log_msg + '\n')
+
+            f_o_log.flush()
+
             print(datetime.datetime.now(), 'epoch', epoch, 'train loss', eloss, 'dev', dev_metrics, 'test',
                   test_metrics, "*", flush=True)
         else:
             print(datetime.datetime.now(), 'epoch', epoch, 'train loss', eloss, 'dev', dev_metrics, flush=True)
+
+    f_o_log.close()
+
+
+
