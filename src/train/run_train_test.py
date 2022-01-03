@@ -44,12 +44,14 @@ def evaluate(config, model, query_id_list):
                 gold_rel.append(rel)
                 pred_rel.append(score)
 
+    rank_path = 'output/%s/trec_rank.txt' % config['dataset']
+    qrel_path = 'output/%s/trec_qrel.txt' % config['dataset'] 
     eval_df = pd.DataFrame(data={
         'id_left': qids,
         'id_right': docids,
         'true': gold_rel,
         'pred': pred_rel
-    })
+    }, rank_path=rank_path, qrel_path=qrel_path)
 
     write_trec_result(eval_df)
     metrics = get_metrics('ndcg_cut')
@@ -339,7 +341,7 @@ def run_evaluate(config):
     print(config)
 
     test_metrics = evaluate(config, model, test_query_ids)
-    log_msg = 'test, %s' % (epoch, json.dumps(test_metrics))
+    log_msg = 'test, %s' % (json.dumps(test_metrics))
     print(log_msg)
     f_o_log.write(log_msg + '\n')
 
