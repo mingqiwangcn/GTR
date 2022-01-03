@@ -9,7 +9,7 @@ import json
 import argparse
 
 from src.train.run_cross_validation import cross_validation
-from src.train.run_train_test import train_and_test
+from src.train.run_train_test import train_and_test, run_evaluate
 from src.train.run_pretraining import pretrain
 
 if __name__ == '__main__':
@@ -27,6 +27,10 @@ if __name__ == '__main__':
     elif args.exp == 'train_test':
         config = json.load(open(args.config))
         train_and_test(config)
+    
+    elif args.exp == 'eval':
+        config = json.load(open(args.config))
+        run_evaluate(config)
 
     # pretrain
     elif args.exp == 'pretrain':

@@ -263,4 +263,86 @@ def train_and_test(config):
     f_o_log.close()
 
 
+def run_evaluate(config):
+    f_o_log = open('output/%s/log.txt' % config['dataset'], 'w')
+    global queries, tables, qtrels
+
+    test_queries = load_queries(config["data_dir"], "test_query.txt")
+    tables = load_tables(config["data_dir"])
+    qtrels = load_qt_relations(config["data_dir"])
+
+    # remove invalid queries
+    test_query_ids = list(test_queries.keys())
+    test_query_ids = [x for x in test_query_ids if x in qtrels]
+
+    queries = {}
+    queries["sentence"] = {}
+    queries["sentence"].update(test_queries)
+
+    del test_queries
+
+    ######## clean the dataset ###########
+    invalid_query = []
+    invalid_table = []
+    missing_pos = []
+    for qid in list(queries["sentence"].keys()):
+        if qid not in qtrels:
+            del queries["sentence"][qid]
+            invalid_query.append(qid)
+        elif qid not in tables:
+            del queries["sentence"][qid]
+            invalid_table.append(qid)
+        elif qid not in qtrels[qid]:
+            qtrels[qid][qid] = 1
+            missing_pos.append(qid)
+    print("invalid_query", len(invalid_query), invalid_query)
+    print("invalid_table", len(invalid_table), invalid_table)
+    print("missing_pos", len(missing_pos), missing_pos)
+
+    missing_tables = []
+    for qid in list(queries["sentence"].keys()):
+        for tid in list(qtrels[qid].keys()):
+            if tid not in tables:
+                del qtrels[qid][tid]
+                missing_tables.append(tid)
+    print("missing_tables", len(missing_tables), missing_tables)
+
+    valid_tables = set()
+    for qid in qtrels.keys():
+        for tid in qtrels[qid].keys():
+            valid_tables.add(tid)
+    for tid in list(tables.keys()):
+        if tid not in valid_tables:
+            del tables[tid]
+
+    new_ids = []
+    for qid in test_query_ids:
+        if qid in queries["sentence"]:
+            new_ids.append(qid)
+    print("missing test queries", len(test_query_ids) - len(new_ids))
+    test_query_ids = new_ids
+    #######################################
+
+    constructor = TabularGraph(config["fasttext"], config["merge_same_cells"])
+
+    queries["feature"] = process_queries(queries["sentence"], constructor)
+    process_tables(tables, constructor)
+
+    model = MatchingModel(bert_dir=config["bert_dir"], do_lower_case=config["do_lower_case"],
+                          bert_size=config["bert_size"], gnn_output_size=config["gnn_size"])
+
+    if config["use_pretrained_model"]:
+        pretrain_model = torch.load(config["pretrained_model_path"])
+        model.load_state_dict(pretrain_model, strict=False)
+
+    model = model.to("cuda")
+    print(config)
+
+    test_metrics = evaluate(config, model, test_query_ids)
+    log_msg = 'test, %s' % (epoch, json.dumps(test_metrics))
+    print(log_msg)
+    f_o_log.write(log_msg + '\n')
+
+    f_o_log.close()
+
 
