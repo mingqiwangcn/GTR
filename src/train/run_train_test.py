@@ -51,9 +51,9 @@ def evaluate(config, model, query_id_list):
         'id_right': docids,
         'true': gold_rel,
         'pred': pred_rel
-    }, rank_path=rank_path, qrel_path=qrel_path)
+    })
 
-    write_trec_result(eval_df)
+    write_trec_result(eval_df, rank_path=rank_path, qrel_path=qrel_path)
     metrics = get_metrics('ndcg_cut')
     metrics.update(get_metrics('map'))
     return metrics
@@ -281,48 +281,6 @@ def run_evaluate(config):
     queries["sentence"] = {}
     queries["sentence"].update(test_queries)
 
-    del test_queries
-
-    ######## clean the dataset ###########
-    invalid_query = []
-    invalid_table = []
-    missing_pos = []
-    for qid in list(queries["sentence"].keys()):
-        if qid not in qtrels:
-            del queries["sentence"][qid]
-            invalid_query.append(qid)
-        elif qid not in tables:
-            del queries["sentence"][qid]
-            invalid_table.append(qid)
-        elif qid not in qtrels[qid]:
-            qtrels[qid][qid] = 1
-            missing_pos.append(qid)
-    print("invalid_query", len(invalid_query), invalid_query)
-    print("invalid_table", len(invalid_table), invalid_table)
-    print("missing_pos", len(missing_pos), missing_pos)
-
-    missing_tables = []
-    for qid in list(queries["sentence"].keys()):
-        for tid in list(qtrels[qid].keys()):
-            if tid not in tables:
-                del qtrels[qid][tid]
-                missing_tables.append(tid)
-    print("missing_tables", len(missing_tables), missing_tables)
-
-    valid_tables = set()
-    for qid in qtrels.keys():
-        for tid in qtrels[qid].keys():
-            valid_tables.add(tid)
-    for tid in list(tables.keys()):
-        if tid not in valid_tables:
-            del tables[tid]
-
-    new_ids = []
-    for qid in test_query_ids:
-        if qid in queries["sentence"]:
-            new_ids.append(qid)
-    print("missing test queries", len(test_query_ids) - len(new_ids))
-    test_query_ids = new_ids
     #######################################
 
     constructor = TabularGraph(config["fasttext"], config["merge_same_cells"])

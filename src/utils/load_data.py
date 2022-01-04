@@ -19,7 +19,8 @@ def load_queries(data_dir, file_name='queries.txt'):
     queries = {}
     with open(os.path.join(data_dir, file_name)) as f:
         for line in f.readlines():
-            query = line.strip().split()
+            query = line.strip().split('\t')
+            assert(len(query) == 2)
             queries[query[0]] = query[1:]
     return queries
 
@@ -28,7 +29,8 @@ def load_qt_relations(data_dir):
     qtrels = {}
     with open(os.path.join(data_dir, 'qtrels.txt')) as f:
         for line in f.readlines():
-            rel = line.strip().split()
+            rel = line.strip().split('\t')
+            assert (len(rel) == 4)
             rel[0] = rel[0]
             rel[3] = int(rel[3])
             if rel[0] not in qtrels:
