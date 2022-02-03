@@ -56,7 +56,7 @@ def process_query(args, table_dict, out_table_dict, qt_rels):
             labels = [int(a in gold_table_lst) for a in retr_table_lst]
            
             if args.mode == 'train': 
-                if max(labels) < 1:
+                if (max(labels) < 1) or (min(labels) > 0):
                     continue 
 
             out_query_item = [qid, question]
