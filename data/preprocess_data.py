@@ -8,19 +8,6 @@ def get_args():
     args = parser.parse_args()
     return args
 
-def read_retr_data(retr_file):
-    retr_dict = {}
-    with open(retr_file) as f:
-        for line in f:
-            item = json.loads(line)
-            qid = item['qid']
-            tag_lst = item['passage_tags']
-            table_id_lst = [a['table_id'] for a in tag_lst]
-            table_set = set(table_id_lst)
-            table_lst = list(table_set)
-            retr_dict[qid] = table_lst
-    return retr_dict
-
 def read_tables(table_file):
     table_dict = {}
     with open(table_file) as f:
@@ -61,16 +48,20 @@ def process_query(args, table_dict, out_table_dict, qt_rels):
             qid = item['id']
             question = item['question']
             
-            out_query_item = [qid, question]
-            out_query_text = '\t'.join(out_query_item)
-            f_o.write(out_query_text + '\n')
-
             gold_table_lst = item['table_id_lst']
             passage_info_lst = item['ctxs']
             
             retr_table_lst = [a['tag']['table_id'] for a in passage_info_lst]
             retr_table_lst = list(set(retr_table_lst))
             labels = [int(a in gold_table_lst) for a in retr_table_lst]
+           
+            if args.mode == 'train': 
+                if max(labels) < 1:
+                    continue 
+
+            out_query_item = [qid, question]
+            out_query_text = '\t'.join(out_query_item)
+            f_o.write(out_query_text + '\n')
             
             for idx, retr_table_id in enumerate(retr_table_lst):
                 assert ('\t' not in retr_table_id)
