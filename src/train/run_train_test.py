@@ -12,52 +12,57 @@ from src.utils.process_table_and_query import *
 import torch
 import json
 
+import numpy as np
+import os
+
 queries = None
 tables = None
 qtrels = None
 
 
-def evaluate(config, model, query_id_list):
-    qids = []
-    docids = []
-    gold_rel = []
-    pred_rel = []
-
+def evaluate(epoch, config, model, query_id_list):
+    out_pred_file = './output/%s/epoch_%d_pred.jsonl' % (config['dataset'], epoch)
+    f_o_pred = open(out_pred_file, 'w')
+    metric_lst = []
     model.eval()
     with torch.no_grad():
         for qid in tqdm(query_id_list):
             query = queries["sentence"][qid]
             query_feature = queries["feature"][qid].to("cuda")
-
+           
+            score_info_lst = [] 
             for (tid, rel) in qtrels[qid].items():
-                if tid not in tables:
-                    continue
-
                 table = tables[tid]
                 dgl_graph = tables[tid]["dgl_graph"].to("cuda")
                 node_features = tables[tid]["node_features"].to("cuda")
 
                 score = model(table, query, dgl_graph, node_features, query_feature).item()
+                
+                score_info = {
+                    'table_id':tid,
+                    'label':int(rel),
+                    'score':score
+                }
+                score_info_lst.append(score_info)
+            
+            best_idx = get_top_pred(score_info_lst)
+            correct = score_info_lst[best_idx]['label']
+            metric_lst.append(correct)
+            out_pred_item = {
+                'qid':qid,
+                'score_info':score_info_lst[best_idx]
+            }
+            f_o_pred.write(json.dumps(out_pred_item) + '\n')
+    
+    f_o_pred.close()
+    mean_metric = np.mean(metric_lst) * 100
+    result = {'p@1':mean_metric}
+    return result
 
-                qids.append(qid)
-                docids.append(tid)
-                gold_rel.append(rel)
-                pred_rel.append(score)
-
-    rank_path = 'output/%s/trec_rank.txt' % config['dataset']
-    qrel_path = 'output/%s/trec_qrel.txt' % config['dataset'] 
-    eval_df = pd.DataFrame(data={
-        'id_left': qids,
-        'id_right': docids,
-        'true': gold_rel,
-        'pred': pred_rel
-    })
-
-    write_trec_result(eval_df, rank_path=rank_path, qrel_path=qrel_path)
-    metrics = get_metrics('ndcg_cut')
-    metrics.update(get_metrics('map'))
-    return metrics
-
+def get_top_pred(score_info_lst):
+    score_lst = [a['score'] for a in score_info_lst]
+    best_idx = np.argmax(score_lst)
+    return best_idx 
 
 def train(config, model, train_query_ids, optimizer, scheduler, loss_func):
     random.shuffle(train_query_ids)
@@ -80,9 +85,6 @@ def train(config, model, train_query_ids, optimizer, scheduler, loss_func):
         label = None
         pos = 0
         for (tid, rel) in qtrels[qid].items():
-            if tid not in tables:
-                continue
-
             if rel == 1:
                 label = torch.LongTensor([pos]).to("cuda")
 
@@ -122,14 +124,20 @@ def train(config, model, train_query_ids, optimizer, scheduler, loss_func):
 
     return eloss / len(train_query_ids)
 
-def save_model(epoc, model):
-    file_name = 'output/webquerytable/model_epoc_%d.bin' % epoc
+def save_model(epoch, model, dataset):
+    file_name = 'output/%s/epoc_%d_model.bin' % (dataset, epoch)
     torch.save(model.state_dict(), file_name)
 
 def train_and_test(config):
     set_random_seed()
-
-    f_o_log = open('output/webquerytable/log.txt', 'w')
+    
+    out_dataset_dir = 'output/%s' % config['dataset']
+    if os.path.isdir(out_dataset_dir):
+        print('[%s] already exists' % out_dataset_dir)
+        return
+    os.makedirs(out_dataset_dir)
+     
+    f_o_log = open('output/%s/log.txt' % config['dataset'], 'w')
 
     global queries, tables, qtrels
 
@@ -141,12 +149,10 @@ def train_and_test(config):
 
     # remove invalid queries
     train_query_ids = list(train_queries.keys())
-    train_query_ids = [x for x in train_query_ids if x in qtrels]
     dev_query_ids = list(dev_queries.keys())
-    dev_query_ids = [x for x in dev_query_ids if x in qtrels]
     test_query_ids = list(test_queries.keys())
-    test_query_ids = [x for x in test_query_ids if x in qtrels]
-
+    
+    num_total_queries = len(train_query_ids) + len(dev_query_ids) + len(test_query_ids)
     queries = {}
     queries["sentence"] = {}
     queries["sentence"].update(train_queries)
@@ -154,61 +160,8 @@ def train_and_test(config):
     queries["sentence"].update(test_queries)
 
     del train_queries, dev_queries, test_queries
+    assert(len(queries['sentence']) == num_total_queries)
 
-    ######## clean the dataset ###########
-    invalid_query = []
-    invalid_table = []
-    missing_pos = []
-    for qid in list(queries["sentence"].keys()):
-        if qid not in qtrels:
-            del queries["sentence"][qid]
-            invalid_query.append(qid)
-        elif qid not in tables:
-            del queries["sentence"][qid]
-            invalid_table.append(qid)
-        elif qid not in qtrels[qid]:
-            qtrels[qid][qid] = 1
-            missing_pos.append(qid)
-    print("invalid_query", len(invalid_query), invalid_query)
-    print("invalid_table", len(invalid_table), invalid_table)
-    print("missing_pos", len(missing_pos), missing_pos)
-
-    missing_tables = []
-    for qid in list(queries["sentence"].keys()):
-        for tid in list(qtrels[qid].keys()):
-            if tid not in tables:
-                del qtrels[qid][tid]
-                missing_tables.append(tid)
-    print("missing_tables", len(missing_tables), missing_tables)
-
-    valid_tables = set()
-    for qid in qtrels.keys():
-        for tid in qtrels[qid].keys():
-            valid_tables.add(tid)
-    for tid in list(tables.keys()):
-        if tid not in valid_tables:
-            del tables[tid]
-
-    new_ids = []
-    for qid in train_query_ids:
-        if qid in queries["sentence"]:
-            new_ids.append(qid)
-    print("missing train queries", len(train_query_ids) - len(new_ids))
-    train_query_ids = new_ids
-
-    new_ids = []
-    for qid in dev_query_ids:
-        if qid in queries["sentence"]:
-            new_ids.append(qid)
-    print("missing dev queries", len(dev_query_ids) - len(new_ids))
-    dev_query_ids = new_ids
-
-    new_ids = []
-    for qid in test_query_ids:
-        if qid in queries["sentence"]:
-            new_ids.append(qid)
-    print("missing test queries", len(test_query_ids) - len(new_ids))
-    test_query_ids = new_ids
     #######################################
 
     constructor = TabularGraph(config["fasttext"], config["merge_same_cells"])
@@ -225,9 +178,6 @@ def train_and_test(config):
 
     model = model.to("cuda")
 
-    print(config)
-    print(model, flush=True)
-
     loss_func = torch.nn.CrossEntropyLoss()
 
     optimizer = torch.optim.Adam([
@@ -240,17 +190,15 @@ def train_and_test(config):
 
     for epoch in range(config['epoch']):
         eloss = train(config, model, train_query_ids, optimizer, scheduler, loss_func)
-        dev_metrics = evaluate(config, model, dev_query_ids)
-        
-        save_model(epoch, model)
-
-        if best_metrics is None or dev_metrics[config['key_metric']] > best_metrics[config['key_metric']]:
+        save_model(epoch, model, config['dataset'])
+        dev_metrics = evaluate(epoch, config, model, dev_query_ids)
+        if best_metrics is None or dev_metrics['p@1'] > best_metrics['p@1']:
             best_metrics = dev_metrics
            
             log_msg = 'epoch=%d, dev, %s' % (epoch, json.dumps(best_metrics))
             f_o_log.write(log_msg + '\n')
 
-            test_metrics = evaluate(config, model, test_query_ids)
+            test_metrics = evaluate(epoch, config, model, test_query_ids)
             
             log_msg = 'epoch=%d, test, %s' % (epoch, json.dumps(test_metrics))
             f_o_log.write(log_msg + '\n')
@@ -273,9 +221,7 @@ def run_evaluate(config):
     tables = load_tables(config["data_dir"])
     qtrels = load_qt_relations(config["data_dir"])
 
-    # remove invalid queries
     test_query_ids = list(test_queries.keys())
-    test_query_ids = [x for x in test_query_ids if x in qtrels]
 
     queries = {}
     queries["sentence"] = {}
@@ -298,7 +244,7 @@ def run_evaluate(config):
     model = model.to("cuda")
     print(config)
 
-    test_metrics = evaluate(config, model, test_query_ids)
+    test_metrics = evaluate(0, config, model, test_query_ids)
     log_msg = 'test, %s' % (json.dumps(test_metrics))
     print(log_msg)
     f_o_log.write(log_msg + '\n')
