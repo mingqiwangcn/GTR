@@ -19,9 +19,11 @@ queries = None
 tables = None
 qtrels = None
 
+global_step = 0
+checkpoint_step = 3000
 
-def evaluate(epoch, config, model, query_id_list):
-    out_pred_file = './output/%s/epoch_%d_pred.jsonl' % (config['dataset'], epoch)
+def evaluate(epoch, step, config, model, query_id_list, mode):
+    out_pred_file = './output/%s/epoch_%d_step_%d_pred_%s.jsonl' % (config['dataset'], epoch, step, mode)
     f_o_pred = open(out_pred_file, 'w')
     metric_lst = []
     model.eval()
@@ -64,7 +66,7 @@ def get_top_pred(score_info_lst):
     best_idx = np.argmax(score_lst)
     return best_idx 
 
-def train(config, model, train_query_ids, optimizer, scheduler, loss_func):
+def train(epoch, config, model, train_query_ids, optimizer, scheduler, loss_func, dev_query_ids, test_query_ids):
     random.shuffle(train_query_ids)
 
     model.train()
@@ -73,7 +75,9 @@ def train(config, model, train_query_ids, optimizer, scheduler, loss_func):
     batch_loss = 0
     n_iter = 0
     cnt = 0
-
+    
+    global global_step
+     
     pbar = tqdm(train_query_ids)
     for qid in pbar:
         cnt += 1
@@ -106,6 +110,8 @@ def train(config, model, train_query_ids, optimizer, scheduler, loss_func):
         batch_loss += loss
 
         n_iter += 1
+        
+        global_step += 1
 
         if n_iter % config["batch_size"] == 0 or cnt == len(train_query_ids):
             batch_loss /= config["batch_size"]
@@ -121,12 +127,38 @@ def train(config, model, train_query_ids, optimizer, scheduler, loss_func):
             batch_loss = 0
 
         eloss += loss.item()
+        
+        if global_step % checkpoint_step == 0:
+            evaluate_step(epoch, global_step, config, model, dev_query_ids, test_query_ids)
 
     return eloss / len(train_query_ids)
 
-def save_model(epoch, model, dataset):
-    file_name = 'output/%s/epoc_%d_model.bin' % (dataset, epoch)
+def save_model(epoch, step, model, dataset):
+    file_name = 'output/%s/epoc_%d_step_%d_model.bin' % (dataset, epoch, step)
     torch.save(model.state_dict(), file_name)
+
+def evaluate_step(epoch, step, config, model, dev_query_ids, test_query_ids):
+    global best_metrics
+    save_model(epoch, step, model, config['dataset'])
+    dev_metrics = evaluate(epoch, step, config, model, dev_query_ids, 'dev')
+    if best_metrics is None or dev_metrics['p@1'] > best_metrics['p@1']:
+        best_metrics = dev_metrics
+       
+        log_msg = 'epoch=%d, dev, %s' % (epoch, json.dumps(best_metrics))
+        f_o_log.write(log_msg + '\n')
+
+        test_metrics = evaluate(epoch, step, config, model, test_query_ids, 'test')
+        
+        log_msg = 'epoch=%d, test, %s' % (epoch, json.dumps(test_metrics))
+        f_o_log.write(log_msg + '\n')
+
+        f_o_log.flush()
+
+        print(datetime.datetime.now(), 'epoch', epoch, 'train loss', eloss, 'dev', dev_metrics, 'test',
+              test_metrics, "*", flush=True)
+    else:
+        print(datetime.datetime.now(), 'epoch', epoch, 'train loss', eloss, 'dev', dev_metrics, flush=True)
+
 
 def train_and_test(config):
     set_random_seed()
@@ -136,7 +168,8 @@ def train_and_test(config):
         print('[%s] already exists' % out_dataset_dir)
         return
     os.makedirs(out_dataset_dir)
-     
+
+    global f_o_log     
     f_o_log = open('output/%s/log.txt' % config['dataset'], 'w')
 
     global queries, tables, qtrels
@@ -186,29 +219,11 @@ def train_and_test(config):
     ])
     scheduler = WarmupLinearSchedule(optimizer, warmup_steps=config["warmup_steps"], t_total=config["total_steps"])
 
+    global best_metrics
     best_metrics = None
 
     for epoch in range(config['epoch']):
-        eloss = train(config, model, train_query_ids, optimizer, scheduler, loss_func)
-        save_model(epoch, model, config['dataset'])
-        dev_metrics = evaluate(epoch, config, model, dev_query_ids)
-        if best_metrics is None or dev_metrics['p@1'] > best_metrics['p@1']:
-            best_metrics = dev_metrics
-           
-            log_msg = 'epoch=%d, dev, %s' % (epoch, json.dumps(best_metrics))
-            f_o_log.write(log_msg + '\n')
-
-            test_metrics = evaluate(epoch, config, model, test_query_ids)
-            
-            log_msg = 'epoch=%d, test, %s' % (epoch, json.dumps(test_metrics))
-            f_o_log.write(log_msg + '\n')
-
-            f_o_log.flush()
-
-            print(datetime.datetime.now(), 'epoch', epoch, 'train loss', eloss, 'dev', dev_metrics, 'test',
-                  test_metrics, "*", flush=True)
-        else:
-            print(datetime.datetime.now(), 'epoch', epoch, 'train loss', eloss, 'dev', dev_metrics, flush=True)
+        train(epoch, config, model, train_query_ids, optimizer, scheduler, loss_func, dev_query_ids, test_query_ids)
 
     f_o_log.close()
 
@@ -244,7 +259,7 @@ def run_evaluate(config):
     model = model.to("cuda")
     print(config)
 
-    test_metrics = evaluate(0, config, model, test_query_ids)
+    test_metrics = evaluate(0, 0, config, model, test_query_ids, 'test')
     log_msg = 'test, %s' % (json.dumps(test_metrics))
     print(log_msg)
     f_o_log.write(log_msg + '\n')
