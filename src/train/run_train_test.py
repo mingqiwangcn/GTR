@@ -154,10 +154,10 @@ def evaluate_step(epoch, step, config, model, dev_query_ids, test_query_ids):
 
         f_o_log.flush()
 
-        print(datetime.datetime.now(), 'epoch', epoch, 'train loss', eloss, 'dev', dev_metrics, 'test',
+        print(datetime.datetime.now(), 'epoch', epoch, 'dev', dev_metrics, 'test',
               test_metrics, "*", flush=True)
     else:
-        print(datetime.datetime.now(), 'epoch', epoch, 'train loss', eloss, 'dev', dev_metrics, flush=True)
+        print(datetime.datetime.now(), 'epoch', epoch, 'dev', dev_metrics, flush=True)
 
 
 def train_and_test(config):
