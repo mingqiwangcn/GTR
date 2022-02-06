@@ -23,7 +23,11 @@ global_step = 0
 checkpoint_step = 3000
 
 def evaluate(epoch, step, config, model, query_id_list, mode):
-    out_pred_file = './output/%s/epoch_%d_step_%d_pred_%s.jsonl' % (config['dataset'], epoch, step, mode)
+    if step is not None:
+        out_pred_file = './output/%s/epoch_%d_step_%d_pred_%s.jsonl' % (config['dataset'], epoch, step, mode)
+    else:
+        out_pred_file = './output/%s/epoch_%d_pred_%s.jsonl' % (config['dataset'], epoch, mode)
+
     f_o_pred = open(out_pred_file, 'w')
     metric_lst = []
     model.eval()
