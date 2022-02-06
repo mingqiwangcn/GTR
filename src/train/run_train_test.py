@@ -131,33 +131,42 @@ def train(epoch, config, model, train_query_ids, optimizer, scheduler, loss_func
         if global_step % checkpoint_step == 0:
             evaluate_step(epoch, global_step, config, model, dev_query_ids, test_query_ids)
 
+    evaluate_step(epoch, None, config, model, dev_query_ids, test_query_ids)
+
     return eloss / len(train_query_ids)
 
 def save_model(epoch, step, model, dataset):
-    file_name = 'output/%s/epoc_%d_step_%d_model.bin' % (dataset, epoch, step)
+    if step is not None:
+        file_name = 'output/%s/epoc_%d_step_%d_model.bin' % (dataset, epoch, step)
+    else:
+        file_name = 'output/%s/epoc_%d_model.bin' % (dataset, epoch)
     torch.save(model.state_dict(), file_name)
 
 def evaluate_step(epoch, step, config, model, dev_query_ids, test_query_ids):
+    if step is None:
+        step_desp = ''
+    else:
+        step_desp = str(step)
     global best_metrics
     save_model(epoch, step, model, config['dataset'])
     dev_metrics = evaluate(epoch, step, config, model, dev_query_ids, 'dev')
     if best_metrics is None or dev_metrics['p@1'] > best_metrics['p@1']:
         best_metrics = dev_metrics
        
-        log_msg = 'epoch=%d, dev, %s' % (epoch, json.dumps(best_metrics))
+        log_msg = 'epoch=%d, step=%s, dev, %s' % (epoch, step_desp, json.dumps(best_metrics))
         f_o_log.write(log_msg + '\n')
 
         test_metrics = evaluate(epoch, step, config, model, test_query_ids, 'test')
         
-        log_msg = 'epoch=%d, test, %s' % (epoch, json.dumps(test_metrics))
+        log_msg = 'epoch=%d, step=%s, test, %s' % (epoch, step_desp, json.dumps(test_metrics))
         f_o_log.write(log_msg + '\n')
 
         f_o_log.flush()
 
-        print(datetime.datetime.now(), 'epoch', epoch, 'dev', dev_metrics, 'test',
+        print(datetime.datetime.now(), 'epoch', epoch, 'step', step_desp, 'dev', dev_metrics, 'test',
               test_metrics, "*", flush=True)
     else:
-        print(datetime.datetime.now(), 'epoch', epoch, 'dev', dev_metrics, flush=True)
+        print(datetime.datetime.now(), 'epoch', epoch, 'step', step_desp, 'dev', dev_metrics, flush=True)
 
 
 def train_and_test(config):
