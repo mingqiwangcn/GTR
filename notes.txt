@@ -1,3 +1,2 @@
 conda create --name gtr python=3.7.9
-upgrade cuda to 10.2
-
+install CUDA Toolkit 10.2 (root user)
