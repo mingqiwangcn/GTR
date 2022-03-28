@@ -21,12 +21,17 @@ qtrels = None
 
 global_step = 0
 
-def evaluate(epoch, step, config, model, query_id_list, mode):
-    if step is not None:
-        out_pred_file = './output/%s/epoch_%d_step_%d_pred_%s.jsonl' % (config['dataset'], epoch, step, mode)
-    else:
-        out_pred_file = './output/%s/epoch_%d_pred_%s.jsonl' % (config['dataset'], epoch, mode)
+def get_output_dir(config):
+    output_dir = config['output_dir']
+    return output_dir
 
+def evaluate(epoch, step, config, model, query_id_list, mode):
+    output_dir = get_output_dir(config)
+    if step is not None:
+        out_file_name = 'epoch_%d_step_%d_pred_%s.jsonl' % (epoch, step, mode)
+    else:
+        out_file_name = 'epoch_%d_pred_%s.jsonl' % (epoch, mode)
+    out_pred_file = os.path.join(output_dir, out_file_name)
     f_o_pred = open(out_pred_file, 'w')
     metric_lst = []
     model.eval()
@@ -78,7 +83,8 @@ def train(epoch, config, model, train_query_ids, optimizer, scheduler, loss_func
     batch_loss = 0
     n_iter = 0
     cnt = 0
-    
+   
+    output_dir = get_output_dir(config) 
     global global_step
     checkpoint_steps = config['checkpoint_steps']
     pbar = tqdm(train_query_ids)
@@ -132,26 +138,28 @@ def train(epoch, config, model, train_query_ids, optimizer, scheduler, loss_func
         eloss += loss.item()
         
         if global_step % checkpoint_steps == 0:
-            evaluate_step(epoch, global_step, config, model, dev_query_ids, test_query_ids)
+            evaluate_step(epoch, global_step, config, model, dev_query_ids, test_query_ids, output_dir)
 
-    evaluate_step(epoch, None, config, model, dev_query_ids, test_query_ids)
+    evaluate_step(epoch, None, config, model, dev_query_ids, test_query_ids, output_dir)
 
     return eloss / len(train_query_ids)
 
-def save_model(epoch, step, model, dataset):
+def save_model(epoch, step, model, output_dir):
     if step is not None:
-        file_name = 'output/%s/epoc_%d_step_%d_model.bin' % (dataset, epoch, step)
+        file_name = 'epoc_%d_step_%d_model.bin' % (epoch, step)
     else:
-        file_name = 'output/%s/epoc_%d_model.bin' % (dataset, epoch)
-    torch.save(model.state_dict(), file_name)
+        file_name = 'epoc_%d_model.bin' % epoch
 
-def evaluate_step(epoch, step, config, model, dev_query_ids, test_query_ids):
+    out_file = os.path.join(output_dir, file_name)
+    torch.save(model.state_dict(), out_file)
+
+def evaluate_step(epoch, step, config, model, dev_query_ids, test_query_ids, output_dir):
     if step is None:
         step_desp = ''
     else:
         step_desp = str(step)
     global best_metrics
-    save_model(epoch, step, model, config['dataset'])
+    save_model(epoch, step, model, output_dir)
     dev_metrics = evaluate(epoch, step, config, model, dev_query_ids, 'dev')
     if best_metrics is None or dev_metrics['p@1'] > best_metrics['p@1']:
         best_metrics = dev_metrics
@@ -175,14 +183,15 @@ def evaluate_step(epoch, step, config, model, dev_query_ids, test_query_ids):
 def train_and_test(config):
     set_random_seed()
     
-    out_dataset_dir = 'output/%s' % config['dataset']
+    out_dataset_dir = get_output_dir(config)
     if os.path.isdir(out_dataset_dir):
         print('[%s] already exists' % out_dataset_dir)
         return
     os.makedirs(out_dataset_dir)
 
-    global f_o_log     
-    f_o_log = open('output/%s/log.txt' % config['dataset'], 'w')
+    global f_o_log
+    log_file = os.path.join(out_dataset_dir, 'log.txt')    
+    f_o_log = open(log_file, 'w')
 
     global queries, tables, qtrels
 
@@ -241,7 +250,9 @@ def train_and_test(config):
 
 
 def run_evaluate(config):
-    f_o_log = open('output/%s/log.txt' % config['dataset'], 'w')
+    output_dir = get_output_dir(config)
+    log_file = os.path.join(output_dir, 'log.txt')
+    f_o_log = open(log_file, 'w')
     global queries, tables, qtrels
 
     test_queries = load_queries(config["data_dir"], "test_query.txt")

@@ -1,10 +1,12 @@
 import json
 from tqdm import tqdm
+import os
 import argparse
 
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', type=str, required=True)
+    parser.add_argument('--real_or_syt', type=str, required=True)
     args = parser.parse_args()
     return args
 
@@ -38,10 +40,10 @@ def get_out_table(table_id, src_table_dict):
     }
     return out_table
 
-def process_query(args, table_dict, out_table_dict, qt_rels):
-    out_query_file = './%s/%s_query.txt' % (args.dataset, args.mode)
+def process_query(args, table_dict, out_table_dict, qt_rels, data_dir):
+    out_query_file = os.path.join(data_dir, '%s_query.txt' % args.mode)
     f_o = open(out_query_file, 'w')
-    retr_file = './%s/fusion_retrieved_%s.jsonl' % (args.dataset, args.mode)
+    retr_file = os.path.join(data_dir, 'fusion_retrieved_%s.jsonl' % args.mode)
     with open(retr_file) as f:
         for line in tqdm(f):
             item = json.loads(line)
@@ -78,22 +80,22 @@ def main():
     args = get_args()
     table_file = '/home/cc/data/%s/tables/tables.jsonl' % args.dataset
     table_dict =  read_tables(table_file)
-    
+    data_dir = os.path.join(args.dataset, args.real_or_syt)
     out_table_dict = {}
     qt_rels = []
     mode_lst = ['train', 'dev', 'test']
     for mode in tqdm(mode_lst):
         args.mode = mode
-        process_query(args, table_dict, out_table_dict, qt_rels)
+        process_query(args, table_dict, out_table_dict, qt_rels, data_dir)
 
     print('writing qtrels')
-    out_qt_rel_file = './%s/qtrels.txt' % args.dataset
+    out_qt_rel_file = os.path.join(data_dir, 'qtrels.txt')
     with open(out_qt_rel_file, 'w') as f_o_rel:
         for rel in tqdm(qt_rels):
             f_o_rel.write(rel + '\n')
     
     print('wrting tables')
-    out_table_file = './%s/tables.json' % args.dataset
+    out_table_file = os.path.join(data_dir,'tables.json')
     with open(out_table_file, 'w') as f_o_table:
         json.dump(out_table_dict, f_o_table)
 

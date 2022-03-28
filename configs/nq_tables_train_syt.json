@@ -16,5 +16,6 @@
   "gnn_lr": 1e-4,
   "use_pretrained_model": false,
   "pretrained_model_path": "",
-  "checkpoint_steps":1000
+  "checkpoint_steps":1000,
+  "output_dir":"output/nq_tables/syt"
 }
