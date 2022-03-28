@@ -4,7 +4,7 @@ import argparse
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', type=str)
+    parser.add_argument('--dataset', type=str, required=True)
     args = parser.parse_args()
     return args
 
@@ -41,10 +41,10 @@ def get_out_table(table_id, src_table_dict):
 def process_query(args, table_dict, out_table_dict, qt_rels):
     out_query_file = './%s/%s_query.txt' % (args.dataset, args.mode)
     f_o = open(out_query_file, 'w')
-    retr_file = './%s/triple_template_graph/fusion_retrieved_%s.json' % (args.dataset, args.mode)
+    retr_file = './%s/fusion_retrieved_%s.jsonl' % (args.dataset, args.mode)
     with open(retr_file) as f:
-        retr_result = json.load(f)
-        for item in tqdm(retr_result):
+        for line in tqdm(f):
+            item = json.loads(line)
             qid = item['id']
             question = item['question']
             
@@ -93,7 +93,7 @@ def main():
             f_o_rel.write(rel + '\n')
     
     print('wrting tables')
-    out_table_file = './nq_tables/tables.json'
+    out_table_file = './%s/tables.json' % args.dataset
     with open(out_table_file, 'w') as f_o_table:
         json.dump(out_table_dict, f_o_table)
 
