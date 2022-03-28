@@ -1,6 +1,6 @@
 {
   "dataset": "fetaqa",
-  "data_dir": "data/fetaqa/",
+  "data_dir": "data/fetaqa/real",
   "fasttext": "wiki.en.bin",
   "bert_dir": "bert-base-uncased",
   "merge_same_cells": true,

@@ -1,6 +1,6 @@
 {
-  "dataset": "nq_tables",
-  "data_dir": "data/nq_tables/",
+  "dataset": "fetaqa",
+  "data_dir": "data/fetaqa/syt",
   "fasttext": "wiki.en.bin",
   "bert_dir": "bert-base-uncased",
   "merge_same_cells": true,
@@ -16,5 +16,5 @@
   "gnn_lr": 1e-4,
   "use_pretrained_model": false,
   "pretrained_model_path": "",
-  "checkpoint_steps":1000
+  "checkpoint_steps": 1000
 }
