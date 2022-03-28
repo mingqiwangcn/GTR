@@ -15,5 +15,6 @@
   "bert_lr": 5e-5,
   "gnn_lr": 1e-4,
   "use_pretrained_model": false,
-  "pretrained_model_path": ""
+  "pretrained_model_path": "",
+  "checkpoint_steps": 1000
 }

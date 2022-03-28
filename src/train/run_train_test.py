@@ -20,7 +20,6 @@ tables = None
 qtrels = None
 
 global_step = 0
-checkpoint_step = 3000
 
 def evaluate(epoch, step, config, model, query_id_list, mode):
     if step is not None:
@@ -81,7 +80,7 @@ def train(epoch, config, model, train_query_ids, optimizer, scheduler, loss_func
     cnt = 0
     
     global global_step
-     
+    checkpoint_steps = config['checkpoint_steps']
     pbar = tqdm(train_query_ids)
     for qid in pbar:
         cnt += 1
@@ -132,7 +131,7 @@ def train(epoch, config, model, train_query_ids, optimizer, scheduler, loss_func
 
         eloss += loss.item()
         
-        if global_step % checkpoint_step == 0:
+        if global_step % checkpoint_steps == 0:
             evaluate_step(epoch, global_step, config, model, dev_query_ids, test_query_ids)
 
     evaluate_step(epoch, None, config, model, dev_query_ids, test_query_ids)
