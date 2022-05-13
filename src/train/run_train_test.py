@@ -263,6 +263,10 @@ def train_and_test(config):
 
 def run_evaluate(config):
     output_dir = get_output_dir(config)
+    if os.path.isdir(output_dir):
+        print('[%s] already exists' % output_dir)
+        return
+    os.makedirs(output_dir)
     log_file = os.path.join(output_dir, 'log.txt')
     f_o_log = open(log_file, 'w')
     global queries, tables, qtrels

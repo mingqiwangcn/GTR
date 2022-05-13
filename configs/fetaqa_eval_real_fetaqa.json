@@ -1,6 +1,6 @@
 {
   "dataset": "fetaqa",
-  "data_dir": "data/fetaqa/",
+  "data_dir": "data/fetaqa/real",
   "fasttext": "wiki.en.bin",
   "bert_dir": "bert-base-uncased",
   "merge_same_cells": true,
@@ -15,5 +15,6 @@
   "bert_lr": 5e-5,
   "gnn_lr": 1e-4,
   "use_pretrained_model": true,
-  "pretrained_model_path": "model/model_epoc_3.bin"
+  "pretrained_model_path": "output/fetaqa/real/epoc_0_step_4000_model.bin",
+  "output_dir":"output/fetaqa/real_eval_fetaqa"
 }

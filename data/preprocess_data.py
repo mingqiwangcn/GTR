@@ -6,6 +6,7 @@ import argparse
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', type=str, required=True)
+    parser.add_argument('--do_train', type=int, required=True)
     parser.add_argument('--real_or_syt', type=str, required=True)
     args = parser.parse_args()
     return args
@@ -83,7 +84,10 @@ def main():
     data_dir = os.path.join(args.dataset, args.real_or_syt)
     out_table_dict = {}
     qt_rels = []
-    mode_lst = ['train', 'dev', 'test']
+    if args.do_train:
+        mode_lst = ['train', 'dev', 'test']
+    else:
+        mode_lst = ['test']
     for mode in tqdm(mode_lst):
         args.mode = mode
         process_query(args, table_dict, out_table_dict, qt_rels, data_dir)
