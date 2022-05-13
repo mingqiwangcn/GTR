@@ -43,7 +43,7 @@ def get_out_table(table_id, src_table_dict):
 def process_query(args, table_dict, out_table_dict, qt_rels, data_dir):
     out_query_file = os.path.join(data_dir, '%s_query.txt' % args.mode)
     f_o = open(out_query_file, 'w')
-    retr_file = os.path.join(data_dir, 'fusion_retrieved_%s.jsonl' % args.mode)
+    retr_file = os.path.join(data_dir, 'fusion_retrieved_%s_tagged.jsonl' % args.mode)
     with open(retr_file) as f:
         for line in tqdm(f):
             item = json.loads(line)

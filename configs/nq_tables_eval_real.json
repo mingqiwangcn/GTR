@@ -1,6 +1,6 @@
 {
   "dataset": "nq_tables",
-  "data_dir": "data/nq_tables/real_other",
+  "data_dir": "data/nq_tables/real",
   "fasttext": "wiki.en.bin",
   "bert_dir": "bert-base-uncased",
   "merge_same_cells": true,
@@ -16,5 +16,5 @@
   "gnn_lr": 1e-4,
   "use_pretrained_model": true,
   "pretrained_model_path": "output/nq_tables/real/epoc_1_model.bin",
-  "output_dir":"output/nq_tables/real_other_eval"
+  "output_dir":"output/nq_tables/real_eval_nq_tables"
 }

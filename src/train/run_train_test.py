@@ -33,7 +33,10 @@ def evaluate(epoch, step, config, model, query_id_list, mode):
         out_file_name = 'epoch_%d_pred_%s.jsonl' % (epoch, mode)
     out_pred_file = os.path.join(output_dir, out_file_name)
     f_o_pred = open(out_pred_file, 'w')
-    metric_lst = []
+    metric_dict = {}
+    top_n_lst = [1, 3, 5]
+    for max_top in top_n_lst:
+        metric_dict[max_top] = []
     model.eval()
     with torch.no_grad():
         for qid in tqdm(query_id_list):
@@ -55,24 +58,33 @@ def evaluate(epoch, step, config, model, query_id_list, mode):
                 }
                 score_info_lst.append(score_info)
             
-            best_idx = get_top_pred(score_info_lst)
-            correct = score_info_lst[best_idx]['label']
-            metric_lst.append(correct)
+            sorted_idxes = get_top_pred(score_info_lst)
+            correct_lst = [score_info_lst[a]['label'] for a in sorted_idxes]
+            for max_top in metric_dict:
+                max_correct_lst = metric_dict[max_top]
+                max_correct = max(correct_lst[:max_top])
+                max_correct_lst.append(max_correct)
+
             out_pred_item = {
                 'qid':qid,
-                'score_info':score_info_lst[best_idx]
+                'sorted_idxes':sorted_idxes,
+                'score_info':score_info_lst
             }
             f_o_pred.write(json.dumps(out_pred_item) + '\n')
     
     f_o_pred.close()
-    mean_metric = np.mean(metric_lst) * 100
-    result = {'p@1':mean_metric}
+    result = {}
+    for max_top in metric_dict:
+        mean_metric = np.mean(metric_dict[max_top]) * 100
+        metric_key = 'p@%d' % max_top
+        result[metric_key] = mean_metric
     return result
 
 def get_top_pred(score_info_lst):
-    score_lst = [a['score'] for a in score_info_lst]
-    best_idx = np.argmax(score_lst)
-    return best_idx 
+    score_lst = np.array([a['score'] for a in score_info_lst])
+    sorted_idxes = np.argsort(-score_lst)
+    sorted_idxes_int = [int(a) for a in sorted_idxes]
+    return sorted_idxes_int 
 
 def train(epoch, config, model, train_query_ids, optimizer, scheduler, loss_func, dev_query_ids, test_query_ids):
     random.shuffle(train_query_ids)
